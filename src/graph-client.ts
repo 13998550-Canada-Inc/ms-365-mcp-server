@@ -10,6 +10,7 @@ import {
   loadResilienceConfig,
 } from './lib/graph-resilience.js';
 import { applyBatchContentType } from './lib/batch-content-type.js';
+import { describeRequestOptionsForLog } from './lib/log-redactor.js';
 import { applyMessageSignoffToRequest } from './lib/message-signoff.js';
 import { TRANSPORT_OK_MESSAGE } from './lib/select-projection.js';
 import { open, stat, unlink } from 'fs/promises';
@@ -558,7 +559,7 @@ class GraphClient {
       // Redact accessToken from log output to prevent credential leakage (#601)
       const { accessToken: _redacted, ...safeOptions } = options;
       logger.info(
-        `Calling ${endpoint} with options: ${JSON.stringify(safeOptions)}${_redacted ? ' [accessToken=REDACTED]' : ''}`
+        `Calling ${endpoint} with options: ${describeRequestOptionsForLog(safeOptions)}${_redacted ? ' [accessToken=REDACTED]' : ''}`
       );
 
       // Use new OAuth-aware request method

@@ -6,6 +6,7 @@ import { auditLog, getUserIdentityForAudit, type AuditEvent } from './audit-log.
 import GraphClient from './graph-client.js';
 import { isDestructiveOperation } from './lib/destructive-ops.js';
 import { describePathParam } from './lib/path-params.js';
+import { describeRequestOptionsForLog, describeShapeForLog } from './lib/log-redactor.js';
 import { getAttachmentMinting } from './lib/attachment-minting.js';
 import {
   buildAttachmentUrl,
@@ -1765,12 +1766,9 @@ function hasOwn(obj: Record<string, unknown>, key: string): boolean {
 // on Node 20 well before Node 26. It runs before the try below, so an unguarded throw
 // escapes executeGraphTool entirely: the caller gets a protocol error instead of a tool
 // error, and no audit record is written at all. Nesting depth is caller-controlled.
+// Parameter names and size only: their values carry message text, recipients and search terms.
 function describeParamsForLog(params: Record<string, unknown>): string {
-  try {
-    return JSON.stringify(params);
-  } catch (error) {
-    return `[unserializable: ${error instanceof Error ? error.name : 'unknown error'}]`;
-  }
+  return describeShapeForLog(params);
 }
 
 async function executeGraphTool(
@@ -1999,7 +1997,7 @@ async function executeGraphTool(
         }
       } else if (paramName === 'body') {
         body = paramValue;
-        logger.info(`Set body param: ${JSON.stringify(body)}`);
+        logger.info(`Set body param: ${describeShapeForLog(body)}`);
       } else if (
         path.includes(`:${paramName}`) ||
         path.includes(`{${paramName}}`) ||
@@ -2255,7 +2253,7 @@ async function executeGraphTool(
     // Redact accessToken from log output to prevent credential leakage
     const { accessToken: _redacted, ...safeOptions } = options;
     logger.info(
-      `Making graph request to ${path} with options: ${JSON.stringify(safeOptions)}${_redacted ? ' [accessToken=REDACTED]' : ''}`
+      `Making graph request to ${path} with options: ${describeRequestOptionsForLog(safeOptions)}${_redacted ? ' [accessToken=REDACTED]' : ''}`
     );
 
     const fetchAllPages = params.fetchAllPages === true;

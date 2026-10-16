@@ -694,7 +694,7 @@ class MicrosoftGraphServer {
       if (this.options.enableDynamicRegistration) {
         app.post('/register', async (req, res) => {
           const body = req.body;
-          logger.info('Client registration request', { body });
+          logger.info('Client registration request', { fields: Object.keys(body ?? {}) });
 
           const clientId = `mcp-client-${Date.now()}`;
 
@@ -893,7 +893,8 @@ class MicrosoftGraphServer {
           }
 
           if (!body.grant_type) {
-            logger.error('Token endpoint: grant_type is missing', { body });
+            // Field names only: the body may carry an authorization code or a refresh token.
+            logger.error('Token endpoint: grant_type is missing', { fields: Object.keys(body) });
             res.status(400).json({
               error: 'invalid_request',
               error_description: 'grant_type parameter is required',

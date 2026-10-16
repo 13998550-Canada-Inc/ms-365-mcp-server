@@ -1,5 +1,10 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { redactSensitive, redactionEnabled } from '../src/lib/log-redactor.js';
+import {
+  describeRequestOptionsForLog,
+  describeShapeForLog,
+  redactSensitive,
+  redactionEnabled,
+} from '../src/lib/log-redactor.js';
 
 describe('redactSensitive', () => {
   const JWT =
@@ -96,5 +101,49 @@ describe('redactionEnabled', () => {
   it('is on for any other value', () => {
     process.env.MS365_MCP_REDACT_PII = 'yes';
     expect(redactionEnabled()).toBe(true);
+  });
+});
+
+describe('describeShapeForLog', () => {
+  const message = {
+    subject: 'Quarterly results',
+    body: { contentType: 'Text', content: 'Revenue fell 12%, do not share' },
+    toRecipients: [{ emailAddress: { address: 'cfo@example.com' } }],
+  };
+
+  it('names the fields and the size, never the content', () => {
+    const out = describeShapeForLog(message);
+    expect(out).toMatch(/^object \{subject, body, toRecipients\}, \d+ bytes$/);
+    expect(out).not.toContain('Quarterly');
+    expect(out).not.toContain('Revenue');
+    expect(out).not.toContain('cfo@');
+  });
+
+  it('describes strings, arrays and nothing', () => {
+    expect(describeShapeForLog('héllo')).toBe('string, 6 bytes');
+    expect(describeShapeForLog([1, 2, 3])).toBe('array(3), 7 bytes');
+    expect(describeShapeForLog(undefined)).toBe('undefined');
+    expect(describeShapeForLog(null)).toBe('null');
+  });
+
+  it('survives what cannot be serialized', () => {
+    const loop: Record<string, unknown> = { a: 1 };
+    loop.self = loop;
+    expect(describeShapeForLog(loop)).toBe('object {a, self}');
+  });
+});
+
+describe('describeRequestOptionsForLog', () => {
+  it('keeps the method, names the headers and shapes the body', () => {
+    const out = describeRequestOptionsForLog({
+      method: 'POST',
+      headers: { Prefer: 'outlook.timezone="UTC"' },
+      body: JSON.stringify({ comment: 'Please call me at 555-0100' }),
+    });
+    expect(out).toContain('"method":"POST"');
+    expect(out).toContain('"headers":["Prefer"]');
+    expect(out).toMatch(/"body":"string, \d+ bytes"/);
+    expect(out).not.toContain('555-0100');
+    expect(out).not.toContain('outlook.timezone');
   });
 });

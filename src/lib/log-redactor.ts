@@ -64,6 +64,35 @@ export function redactionEnabled(): boolean {
   return raw !== 'false' && raw !== '0';
 }
 
+/**
+ * What a value looks like, without what it says: its kind, its field names and its size. Mail, event and
+ * file bodies hold the content of someone's messages, which no pattern below can tell from anything else,
+ * so that content is never logged at all, redaction on or off.
+ */
+export function describeShapeForLog(value: unknown): string {
+  if (value === undefined || value === null) return String(value);
+  let size = -1;
+  try {
+    size = Buffer.byteLength(typeof value === 'string' ? value : (JSON.stringify(value) ?? ''), 'utf8');
+  } catch {
+    // circular or otherwise unserializable: described without a size
+  }
+  const kind = Array.isArray(value) ? `array(${value.length})` : typeof value;
+  const fields =
+    typeof value === 'object' && !Array.isArray(value) ? Object.keys(value as object) : [];
+  return `${kind}${fields.length > 0 ? ` {${fields.join(', ')}}` : ''}${size >= 0 ? `, ${size} bytes` : ''}`;
+}
+
+/** Request options for the log: the method and other settings as they are, headers by name, the body by its shape. */
+export function describeRequestOptionsForLog(options: Record<string, unknown>): string {
+  const { body, headers, ...rest } = options;
+  return JSON.stringify({
+    ...rest,
+    ...(headers !== undefined && headers !== null ? { headers: Object.keys(headers as object) } : {}),
+    ...(body !== undefined ? { body: describeShapeForLog(body) } : {}),
+  });
+}
+
 /** Applies every redaction pattern to `input` and returns the scrubbed string. */
 export function redactSensitive(input: string): string {
   let out = input;
